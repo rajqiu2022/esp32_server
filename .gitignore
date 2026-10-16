@@ -1,0 +1,8 @@
+.venv/
+data/
+.runtime/
+.env
+__pycache__/
+*.pyc
+.coverage
+test-results/

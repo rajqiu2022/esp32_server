@@ -1,0 +1,13 @@
+services:
+  studio:
+    build: .
+    init: true
+    restart: unless-stopped
+    environment:
+      ESP_PUBLIC_URL: ${ESP_PUBLIC_URL:-http://127.0.0.1:8002}
+      ESP_WS_URL: ${ESP_WS_URL:-ws://127.0.0.1:8000/xiaozhi/v1/}
+    ports:
+      - "127.0.0.1:8002:8002"
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./data:/app/data
