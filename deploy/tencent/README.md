@@ -3,7 +3,40 @@
 本配置供已有 Linux 服务器使用。实际服务器、域名和 SSH 访问方式确定后再执行部署。
 本机已运行的服务和实物板子的官方服务连接不会因准备这些文件而改变。
 
-## 访问结构
+## 已有 Nginx，使用独立 HTTPS 端口
+
+当前目标服务器已有 Nginx 和域名证书，采用此方式，不新增 80 端口监听。
+使用 `compose.nginx.yml`，将管理端口和语音端口只绑定服务器回环地址，
+由现有 Nginx 的独立 HTTPS 站点转发。例如 `.env.tencent`：
+
+```dotenv
+ESP_PUBLIC_URL=https://voice.example.com:18443
+ESP_WS_URL=wss://voice.example.com:18443/xiaozhi/v1/
+```
+
+```bash
+docker compose --env-file .env.tencent -f deploy/tencent/compose.nginx.yml -p esp32studio build
+docker compose --env-file .env.tencent -f deploy/tencent/compose.nginx.yml -p esp32studio run --rm studio python scripts/prepare_models.py
+docker compose --env-file .env.tencent -f deploy/tencent/compose.nginx.yml -p esp32studio up -d
+```
+
+在现有 Nginx 站点目录新增配置，参考 `nginx.conf.template`，
+替换域名、HTTPS 端口、现有证书文件和私钥文件路径四个占位符。
+先 `nginx -t` 验证，再平滑重载；目标服务器的 Nginx 位于 `/www/server/nginx/sbin/nginx`。
+服务器防火墙与腾讯云安全组均需允许所选 HTTPS 端口，8000/8002 继续仅供内部访问。
+
+此镜像使用 `requirements-cloud.txt` 中的依赖和量化 SenseVoice ONNX，
+不安装本机方案的 PyTorch/FunASR。内存上限 1200MB、CPU 上限 1.5 核，
+运行时通过实际语音联调验证资源占用和响应时间。
+完整上游可选提供商不属于这个精简镜像的依赖范围。
+
+云端模型地址必须是服务器可以访问的服务；本机默认的
+`http://127.0.0.1:11434/v1` 在服务器上不能访问电脑上的 Ollama。
+
+## 独立服务器的 Caddy 方案
+
+以下为没有现有 Web 服务、且允许使用 80/443 的替代部署配置；
+当前要求不使用 80 端口的服务器采用上一节的 Nginx 方案。
 
 - 一个域名承载管理网页、HTTPS 设备配网接口及 WSS 语音。
 - Caddy 自动管理 HTTPS；`/xiaozhi/v1/` 转发语音服务，其余普通请求转发管理服务。
@@ -34,7 +67,7 @@ python scripts/export_state.py
 在服务器首次启动前，将这两个文件恢复到项目 `data/` 目录。已有数据目录应先备份，
 不要直接覆盖正在使用的数据库。恢复后继续使用原账号密码登录，并重新配置云端可访问的模型地址。
 
-## 启动步骤
+## Caddy 方案启动步骤
 
 先确认服务器的系统、内存、磁盘、Docker/Compose、域名解析和网络端口满足实际部署条件。
 以下命令假定 Docker 与 Compose 已安装，并且当前目录为项目根目录：

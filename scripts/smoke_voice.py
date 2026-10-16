@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import sys
 import time
+from urllib.parse import urlsplit
 import uuid
 import wave
 
@@ -26,33 +27,42 @@ from server.store import Store
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--audio", type=Path)
+parser.add_argument("--credentials-stdin", action="store_true", help="Read login JSON from stdin without saving a password file")
+parser.add_argument("--local-services", action="store_true", help="Test loopback services inside a cloud container")
+parser.add_argument("--speech-only", action="store_true", help="Verify live ASR and independent TTS while the LLM API is unconfigured")
 args = parser.parse_args()
 
 
 async def main():
     settings = Config()
-    credentials = json.loads((settings.data / "first-login.txt").read_text(encoding="utf-8"))
+    credentials = json.loads(sys.stdin.read() if args.credentials_stdin else
+                             (settings.data / "first-login.txt").read_text(encoding="utf-8"))
+    base_url = f"http://127.0.0.1:{settings.port}" if args.local_services else settings.public_url
+    host_headers = {"Host": urlsplit(settings.public_url).netloc, "Origin": settings.public_url}
     mac = "02:00:" + ":".join(uuid.uuid4().hex[i:i+2] for i in range(0, 8, 2))
     client_id = uuid.uuid4().hex
     store = Store(settings.data / "control.db")
     created = False
     try:
-        async with ClientSession(cookie_jar=CookieJar(unsafe=True)) as http:
-            async with http.post(settings.public_url + "/api/login", json=credentials) as response:
+        async with ClientSession(cookie_jar=CookieJar(unsafe=True, treat_as_secure_origin=[base_url]), headers=host_headers) as http:
+            async with http.post(base_url + "/api/login", json=credentials) as response:
                 assert response.status == 200, "Admin login failed"
-            async with http.get(settings.public_url + "/api/agents") as response:
+            async with http.get(base_url + "/api/agents") as response:
                 agent = (await response.json())[0]
-            async with http.post(settings.public_url + "/api/devices", json={"name": "Temporary automated voice test", "mac": mac, "agent_id": agent["id"]}) as response:
+            async with http.post(base_url + "/api/devices", json={"name": "Temporary automated voice test", "mac": mac, "agent_id": agent["id"]}) as response:
                 assert response.status == 200, "Virtual-device creation failed"
                 created = True
-            async with http.get(settings.public_url + "/api/devices/" + mac + "/connection") as response:
+            async with http.get(base_url + "/api/devices/" + mac + "/connection") as response:
                 ota_url = (await response.json())["ota_url"]
+                if args.local_services:
+                    ota_url = base_url + urlsplit(ota_url).path
             headers = {"Device-Id": mac, "Client-Id": client_id}
             async with http.post(ota_url, headers=headers, json={"application": {"version": "2.5.3"}}) as response:
                 assert response.status == 200
                 connection = (await response.json())["websocket"]
+            ws_url = "ws://127.0.0.1:8000/xiaozhi/v1/" if args.local_services else connection["url"]
             headers["Authorization"] = "Bearer invalid-token"
-            async with connect(connection["url"], additional_headers=headers) as ws:
+            async with connect(ws_url, additional_headers=headers) as ws:
                 denied = await asyncio.wait_for(ws.recv(), 10)
                 assert "认证失败" in denied, "Unauthenticated device was accepted"
             headers["Authorization"] = "Bearer " + connection["token"]
@@ -61,7 +71,7 @@ async def main():
             else:
                 audio_path = settings.data / "smoke-input.mp3"
                 await edge_tts.Communicate("你好，请用一句简短的话介绍你自己。", "zh-CN-XiaoxiaoNeural").save(str(audio_path))
-            async with connect(connection["url"], additional_headers=headers) as ws:
+            async with connect(ws_url, additional_headers=headers) as ws:
                 await ws.send(json.dumps({"type": "hello", "version": 1, "transport": "websocket", "features": {"mcp": False},
                     "audio_params": {"format": "opus", "sample_rate": 16000, "channels": 1, "frame_duration": 60}}))
                 hello = json.loads(await asyncio.wait_for(ws.recv(), 30))
@@ -84,21 +94,35 @@ async def main():
                         continue
                     obj = json.loads(message)
                     messages.append(obj)
+                    if args.speech_only and obj.get("type") == "stt" and obj.get("text"):
+                        await ws.send(json.dumps({"type": "abort"}))
+                        break
                     if obj.get("type") == "tts" and obj.get("state") == "stop":
                         break
                 assert any(m.get("type") == "stt" and m.get("text") for m in messages), "No ASR result"
-                assert packets, "No synthesized audio received"
-                sample_rate = hello.get("audio_params", {}).get("sample_rate", 16000)
-                decoder = opuslib_next.Decoder(sample_rate, 1)
-                with wave.open(str(settings.data / "smoke-reply.wav"), "wb") as output:
-                    output.setparams((1, 2, sample_rate, 0, "NONE", "not compressed"))
-                    for packet in packets:
-                        output.writeframes(decoder.decode(packet, 5760))
-                print(f"PASS: real ASR -> LLM -> TTS -> {len(packets)} Opus packets -> decoded WAV", flush=True)
+                if args.speech_only:
+                    print("PASS: live cloud worker recognized synthetic speech", flush=True)
+                    target = settings.data / "cloud-tts-check.mp3"
+                    await edge_tts.Communicate("云端语音合成测试成功。", agent["voice"]).save(str(target))
+                    decoded = AudioSegment.from_mp3(target)
+                    assert len(decoded) > 100, "No valid synthesized audio"
+                    decoded.export(settings.data / "cloud-tts-check.wav", format="wav")
+                    print("PASS: independent cloud TTS synthesized and decoded; LLM validation pending API configuration", flush=True)
+                    required_roles = {"user"}
+                else:
+                    assert packets, "No synthesized audio received"
+                    sample_rate = hello.get("audio_params", {}).get("sample_rate", 16000)
+                    decoder = opuslib_next.Decoder(sample_rate, 1)
+                    with wave.open(str(settings.data / "smoke-reply.wav"), "wb") as output:
+                        output.setparams((1, 2, sample_rate, 0, "NONE", "not compressed"))
+                        for packet in packets:
+                            output.writeframes(decoder.decode(packet, 5760))
+                    print(f"PASS: real ASR -> LLM -> TTS -> {len(packets)} Opus packets -> decoded WAV", flush=True)
+                    required_roles = {"user", "assistant"}
                 for _ in range(30):
                     rows = store.all("SELECT role,content FROM messages WHERE device_id=?", (mac,))
-                    if {row["role"] for row in rows} >= {"user", "assistant"}:
-                        print("PASS: both sides of voice conversation persisted in control-plane history", flush=True)
+                    if {row["role"] for row in rows} >= required_roles:
+                        print("PASS: expected voice records persisted in control-plane history", flush=True)
                         break
                     await asyncio.sleep(.5)
                 else:

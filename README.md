@@ -90,7 +90,8 @@ Windows 原生安装还需让当前 Python 找到 `opus.dll` 与完整的 FFmpeg
 
 腾讯云的单域名 HTTPS/WSS 配置与账号迁移说明见 [腾讯云部署](deploy/tencent/README.md)。
 
-提供 `Dockerfile`、`compose.yml` 和前台进程监督器，尚未在当前无 Docker 的 Windows 环境验证镜像构建。
+腾讯云已有 Nginx 的精简镜像已完成实际构建、容器测试及识别/合成组件验证。
+通用 `Dockerfile`、`compose.yml` 和 Caddy 方案供其他环境参考，尚未实际部署验证。
 
 ```bash
 cp .env.example .env
@@ -125,9 +126,14 @@ python scripts/smoke_voice.py --audio /path/to/test.mp3
 确认语音双向文字记录进入管理后台，并将回复解码为 `data/smoke-reply.wav`。
 结束后清理本次创建的临时设备和测试记录。
 
-本机已通过 8 项控制台与迁移集成测试、浏览器登录/添加设备/模型连接/网页对话验证，
+本机与云端容器已通过 9 项控制台、迁移及识别配置测试；本机浏览器登录/添加设备/模型连接/网页对话已验证。
 完整语音测试收到 103 个 Opus 包并成功解码，双向文字记录上报通过。
 模拟设备验证不等同于实物麦克风和扬声器验证。
+
+云端容器中可以用 `--credentials-stdin --local-services` 读取标准输入中的登录 JSON，
+验证内部服务，不把明文密码文件迁移到服务器。
+大模型 API 尚未配置时，`--speech-only` 仅验证实际识别、独立合成及记录上报，
+不会把组件测试当作完整模型对话通过。
 
 ## 数据与配置
 
@@ -138,4 +144,5 @@ python scripts/smoke_voice.py --audio /path/to/test.mp3
 
 `ESP_DATA_DIR` 可指定私有数据目录，`ESP_MODELS_DIR` 可指定模型缓存，
 `ESP_BIND_HOST` 默认为 `127.0.0.1`，`ESP_PORT` 默认为 `8002`。
+`ESP_ASR_BACKEND=sherpa` 选择量化 SenseVoice ONNX；默认 `funasr` 保持本机原有识别方式。
 上游源码只读，运行时复制到忽略的 `.runtime/voice`，本项目配置与旧部署互不覆盖。
