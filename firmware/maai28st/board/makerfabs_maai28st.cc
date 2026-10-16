@@ -6,6 +6,7 @@
 #include "display/lcd_display.h"
 #include "esp32_camera.h"
 #include "lvgl_font.h"
+#include "maai_chat_display.h"
 #include "mcp_server.h"
 #include "wifi_board.h"
 
@@ -23,32 +24,20 @@
 
 static constexpr const char* TAG = "MAAI28ST";
 
-class MaaiDisplay : public SpiLcdDisplay {
-public:
-    using SpiLcdDisplay::SpiLcdDisplay;
-    std::function<void()> on_ready;
-    void SetupUI() override {
-        const bool initialized = IsSetupUICalled();
-        SpiLcdDisplay::SetupUI();
-        if (!initialized && on_ready) {
-            on_ready();
-        }
-    }
-};
-
 class MakerfabsMaai28st : public WifiBoard {
     Button boot_button_{BOOT_BUTTON_GPIO};
     LcdDisplay* display_ = nullptr;
     i2c_master_bus_handle_t touch_bus_ = nullptr;
     std::unique_ptr<Esp32Camera> camera_;
     lv_obj_t* settings_panel_ = nullptr;
+    lv_obj_t* settings_shade_ = nullptr;
+    lv_obj_t* settings_entry_ = nullptr;
     lv_obj_t* wifi_confirm_ = nullptr;
     lv_obj_t* volume_value_ = nullptr;
     lv_obj_t* brightness_value_ = nullptr;
     lv_obj_t* volume_slider_ = nullptr;
     lv_obj_t* brightness_slider_ = nullptr;
     std::shared_ptr<LvglFont> settings_font_;
-    bool touch_can_chat_ = false;
     led_strip_handle_t light_strip_ = nullptr;
     uint32_t light_rmt_signal_ = 0;
     esp_timer_handle_t light_test_timer_ = nullptr;
@@ -199,7 +188,7 @@ class MakerfabsMaai28st : public WifiBoard {
         }
     }
 
-    static lv_color_t Ink() { return lv_color_hex(0x183F35); }
+    static lv_color_t Ink() { return lv_color_hex(0x252525); }
 
     lv_obj_t* Label(lv_obj_t* parent, const char* text, int x, int y) {
         auto* label = lv_label_create(parent);
@@ -227,15 +216,29 @@ class MakerfabsMaai28st : public WifiBoard {
         lv_obj_set_pos(slider, 14, y);
         lv_obj_set_size(slider, 260, 10);
         lv_slider_set_range(slider, minimum, 100);
-        lv_obj_set_style_bg_color(slider, lv_color_hex(0xDDDACE), LV_PART_MAIN);
-        lv_obj_set_style_bg_color(slider, Ink(), LV_PART_INDICATOR);
-        lv_obj_set_style_bg_color(slider, Ink(), LV_PART_KNOB);
+        lv_obj_set_style_bg_color(slider, lv_color_hex(0xE4E4E4), LV_PART_MAIN);
+        lv_obj_set_style_bg_color(slider, lv_color_hex(0x07C160), LV_PART_INDICATOR);
+        lv_obj_set_style_bg_color(slider, lv_color_hex(0x07C160), LV_PART_KNOB);
         lv_obj_set_ext_click_area(slider, 14);
         return slider;
     }
 
+    void RefreshControlFont() {
+        auto font = display_->GetTheme()->GetTextFont();
+        if (!font)
+            return;
+        if (settings_entry_)
+            lv_obj_set_style_text_font(settings_entry_, font->font(), 0);
+        if (settings_shade_)
+            lv_obj_set_style_text_font(settings_shade_, font->font(), 0);
+        if (settings_panel_)
+            lv_obj_set_style_text_font(settings_panel_, font->font(), 0);
+        // Rebind raw LVGL style pointers before releasing the previous owner.
+        settings_font_ = std::move(font);
+    }
+
     void ShowSettings(bool show) {
-        if (!settings_panel_)
+        if (!settings_shade_)
             return;
         if (show) {
             const int volume = GetAudioCodec()->output_volume();
@@ -244,9 +247,21 @@ class MakerfabsMaai28st : public WifiBoard {
             lv_slider_set_value(brightness_slider_, brightness, LV_ANIM_OFF);
             lv_label_set_text_fmt(volume_value_, "%d", volume);
             lv_label_set_text_fmt(brightness_value_, "%d%%", brightness);
-            lv_obj_remove_flag(settings_panel_, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_remove_flag(settings_shade_, LV_OBJ_FLAG_HIDDEN);
+            lv_anim_delete(settings_panel_, nullptr);
+            lv_anim_t animation;
+            lv_anim_init(&animation);
+            lv_anim_set_var(&animation, settings_panel_);
+            lv_anim_set_values(&animation, 28, 42);
+            lv_anim_set_duration(&animation, 120);
+            lv_anim_set_exec_cb(&animation, [](void* object, int32_t y) {
+                lv_obj_set_y(static_cast<lv_obj_t*>(object), y);
+            });
+            lv_anim_start(&animation);
+            ESP_LOGI(TAG, "Quick settings opened");
         } else {
-            lv_obj_add_flag(settings_panel_, LV_OBJ_FLAG_HIDDEN);
+            lv_anim_delete(settings_panel_, nullptr);
+            lv_obj_add_flag(settings_shade_, LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(wifi_confirm_, LV_OBJ_FLAG_HIDDEN);
         }
     }
@@ -257,7 +272,10 @@ class MakerfabsMaai28st : public WifiBoard {
             return;
         settings_font_ = display_->GetTheme()->GetTextFont();
         auto* layer = lv_layer_top();
-        auto* entry = MakeButton(layer, "设置", DISPLAY_WIDTH - 76, DISPLAY_HEIGHT - 44, 68, 36);
+        auto* entry = MakeButton(layer, "设置", 4, 2, 70, 36);
+        settings_entry_ = entry;
+        lv_obj_set_style_bg_opa(entry, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_text_color(entry, lv_color_hex(0x07C160), 0);
         lv_obj_set_style_text_font(entry, settings_font_->font(), 0);
         lv_obj_add_event_cb(
             entry,
@@ -266,30 +284,42 @@ class MakerfabsMaai28st : public WifiBoard {
             },
             LV_EVENT_CLICKED, this);
 
-        settings_panel_ = lv_obj_create(layer);
-        lv_obj_set_size(settings_panel_, DISPLAY_WIDTH, DISPLAY_HEIGHT);
-        lv_obj_set_style_pad_all(settings_panel_, 16, 0);
+        settings_shade_ = lv_obj_create(layer);
+        lv_obj_set_size(settings_shade_, DISPLAY_WIDTH, DISPLAY_HEIGHT);
+        lv_obj_set_style_pad_all(settings_shade_, 0, 0);
+        lv_obj_set_style_radius(settings_shade_, 0, 0);
+        lv_obj_set_style_border_width(settings_shade_, 0, 0);
+        lv_obj_set_style_bg_color(settings_shade_, lv_color_black(), 0);
+        lv_obj_set_style_bg_opa(settings_shade_, LV_OPA_20, 0);
+        lv_obj_set_style_text_font(settings_shade_, settings_font_->font(), 0);
+        lv_obj_remove_flag(settings_shade_, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_add_event_cb(
+            settings_shade_,
+            [](lv_event_t* event) {
+                auto* self = static_cast<MakerfabsMaai28st*>(lv_event_get_user_data(event));
+                if (lv_event_get_target(event) == self->settings_shade_)
+                    self->ShowSettings(false);
+            },
+            LV_EVENT_CLICKED, this);
+        settings_panel_ = lv_obj_create(settings_shade_);
+        lv_obj_set_pos(settings_panel_, 6, 42);
+        lv_obj_set_size(settings_panel_, 308, 192);
+        lv_obj_set_style_pad_all(settings_panel_, 12, 0);
         lv_obj_set_style_border_width(settings_panel_, 0, 0);
-        lv_obj_set_style_radius(settings_panel_, 0, 0);
-        lv_obj_set_style_bg_color(settings_panel_, lv_color_hex(0xF5F1E7), 0);
+        lv_obj_set_style_radius(settings_panel_, 14, 0);
+        lv_obj_set_style_shadow_width(settings_panel_, 14, 0);
+        lv_obj_set_style_shadow_opa(settings_panel_, LV_OPA_20, 0);
+        lv_obj_set_style_bg_color(settings_panel_, lv_color_hex(0xFAFAFA), 0);
         lv_obj_set_style_text_color(settings_panel_, Ink(), 0);
         lv_obj_set_style_text_font(settings_panel_, settings_font_->font(), 0);
         lv_obj_remove_flag(settings_panel_, LV_OBJ_FLAG_SCROLLABLE);
-        Label(settings_panel_, "本机设置", 0, 0);
-        auto* close = MakeButton(settings_panel_, "返回", 218, -4, 70, 34);
-        lv_obj_add_event_cb(
-            close,
-            [](lv_event_t* event) {
-                static_cast<MakerfabsMaai28st*>(lv_event_get_user_data(event))->ShowSettings(false);
-            },
-            LV_EVENT_CLICKED, this);
-        Label(settings_panel_, "音量", 0, 40);
-        volume_value_ = Label(settings_panel_, "35", 238, 40);
-        volume_slider_ = Slider(settings_panel_, 78, 1);
-        Label(settings_panel_, "亮度", 0, 104);
-        brightness_value_ = Label(settings_panel_, "75%", 226, 104);
-        brightness_slider_ = Slider(settings_panel_, 142, 5);
-        auto* wifi = MakeButton(settings_panel_, "Wi-Fi 配网", 0, 174, 288, 34);
+        Label(settings_panel_, "音量", 0, 0);
+        volume_value_ = Label(settings_panel_, "35", 238, 0);
+        volume_slider_ = Slider(settings_panel_, 36, 1);
+        Label(settings_panel_, "亮度", 0, 62);
+        brightness_value_ = Label(settings_panel_, "75%", 226, 62);
+        brightness_slider_ = Slider(settings_panel_, 98, 5);
+        auto* wifi = MakeButton(settings_panel_, "Wi-Fi 配网", 0, 132, 284, 34);
         lv_obj_add_event_cb(
             wifi,
             [](lv_event_t* event) {
@@ -322,10 +352,10 @@ class MakerfabsMaai28st : public WifiBoard {
                 },
                 LV_EVENT_ALL, this);
         }
-        wifi_confirm_ = lv_obj_create(settings_panel_);
+        wifi_confirm_ = lv_obj_create(settings_shade_);
         lv_obj_set_size(wifi_confirm_, 288, 208);
-        lv_obj_set_pos(wifi_confirm_, 0, 0);
-        lv_obj_set_style_bg_color(wifi_confirm_, lv_color_hex(0xF5F1E7), 0);
+        lv_obj_set_pos(wifi_confirm_, 16, 16);
+        lv_obj_set_style_bg_color(wifi_confirm_, lv_color_hex(0xFAFAFA), 0);
         lv_obj_set_style_border_width(wifi_confirm_, 0, 0);
         lv_obj_set_style_pad_all(wifi_confirm_, 10, 0);
         lv_obj_remove_flag(wifi_confirm_, LV_OBJ_FLAG_SCROLLABLE);
@@ -352,7 +382,7 @@ class MakerfabsMaai28st : public WifiBoard {
             },
             LV_EVENT_CLICKED, this);
         ShowSettings(false);
-        ESP_LOGI(TAG, "Touch settings ready: volume, brightness, Wi-Fi");
+        ESP_LOGI(TAG, "Top-left quick settings ready: volume, brightness, Wi-Fi");
     }
 
     static void ToggleChat() {
@@ -396,6 +426,8 @@ class MakerfabsMaai28st : public WifiBoard {
         display_ = new MaaiDisplay(panel_io, panel, DISPLAY_WIDTH, DISPLAY_HEIGHT, 0, 0, true,
                                    false, true);
         static_cast<MaaiDisplay*>(display_)->on_ready = [this]() { InitializeControls(); };
+        static_cast<MaaiDisplay*>(display_)->on_chat = []() { ToggleChat(); };
+        static_cast<MaaiDisplay*>(display_)->on_theme_changed = [this]() { RefreshControlFont(); };
     }
 
     void InitializeCamera() {
@@ -493,30 +525,8 @@ class MakerfabsMaai28st : public WifiBoard {
         lv_touch.disp = lv_display_get_default();
         lv_touch.handle = touch;
         auto* input = lvgl_port_add_touch(&lv_touch);
-        if (input) {
-            lv_indev_add_event_cb(
-                input,
-                [](lv_event_t* event) {
-                    auto* self = static_cast<MakerfabsMaai28st*>(lv_event_get_user_data(event));
-                    if (lv_event_get_code(event) == LV_EVENT_PRESSED) {
-                        lv_point_t point;
-                        lv_indev_get_point(static_cast<lv_indev_t*>(lv_event_get_target(event)),
-                                           &point);
-                        const bool panel_open =
-                            self->settings_panel_ &&
-                            !lv_obj_has_flag(self->settings_panel_, LV_OBJ_FLAG_HIDDEN);
-                        const bool settings_hit =
-                            point.x >= DISPLAY_WIDTH - 80 && point.y >= DISPLAY_HEIGHT - 48;
-                        self->touch_can_chat_ = !panel_open && !settings_hit;
-                    } else if (lv_event_get_code(event) == LV_EVENT_RELEASED &&
-                               self->touch_can_chat_) {
-                        self->touch_can_chat_ = false;
-                        ToggleChat();
-                    }
-                },
-                LV_EVENT_ALL, this);
-            ESP_LOGI(TAG, "GT911 ready; tap chat area or open Settings");
-        }
+        if (input)
+            ESP_LOGI(TAG, "GT911 ready; scroll chat, use voice button or top-left settings");
     }
 
 public:

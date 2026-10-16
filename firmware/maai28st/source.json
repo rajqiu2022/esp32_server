@@ -16,6 +16,23 @@
     "physical_lamp_confirmed_by_user": true,
     "camera_sensor": "OV3660 PID 0x3660",
     "camera_frame": "640x480 RGB565, 614400 bytes",
-    "physical_camera_voice_roundtrip_confirmed_by_user": false
+    "physical_camera_voice_roundtrip_confirmed_by_user": false,
+    "chat_ui_build_passed": true,
+    "chat_ui_flash_hash_verified": true,
+    "chat_ui_layout_boot_verified": true,
+    "chinese_font_loaded_before_wifi": true,
+    "physical_chat_ui_confirmed_by_user": false,
+    "chat_ui_voice_retest_pending": true
+  },
+  "display": {
+    "style": "WeChat message bubbles",
+    "resolution": "320x240",
+    "header_height": 40,
+    "history_height": 158,
+    "voice_bar_height": 42,
+    "max_chat_items": 20,
+    "max_preview_images": 1,
+    "settings": "top-left drop-down with outside-tap dismissal",
+    "offline_chinese_font": "preload installed Noto common 20px font before Wi-Fi"
   }
 }

@@ -4,10 +4,11 @@ MaTouch AI ESP32-S3 2.8 inch ST7789V, 16 MB flash and 8 MB octal PSRAM.
 Display: SPI3 CLK48/MOSI13/CS40/DC21, backlight45; unused SD CS47 held high.
 GT911: SDA39/SCL38/RST18/INT14, 0x5D, landscape 320x240.
 MAX98357: BCLK20/WS1/DOUT19. INMP441: BCLK42/WS2/DIN41.
-BOOT GPIO0 toggles conversation; taps in the chat area do the same.
-The bottom-right Settings button opens persistent volume (1–100) and
-brightness (5–100%) sliders plus a confirmed Wi-Fi reconfiguration action.
-Settings touches do not toggle chat. Slider values apply and persist on release.
+BOOT GPIO0 and the bottom voice button toggle conversation.
+The top-left Settings button opens a drop-down quick-settings panel with
+persistent volume (1–100) and brightness (5–100%) sliders plus a confirmed
+Wi-Fi reconfiguration action. Tap outside to dismiss the panel.
+Settings touches and chat scrolling do not toggle chat. Slider values apply and persist on release.
 UART0 through CH340K is required; native USB uses the speaker pins.
 
 Build with ESP-IDF 6.0.1 or newer:
@@ -46,6 +47,19 @@ GPIO0 button click callbacks ignore the 600 ms window after lamp transmission,
 to discard scanner events caused by the LED waveform. BOOT toggles chat only in
 idle/listening/speaking states; Wi-Fi setup is available in the touch settings.
 This prevents a startup pulse from entering provisioning while Wi-Fi initializes.
+
+## Chat screen
+
+This variant selects the upstream WeChat message style through config.json.
+`maai_chat_display.h` specializes its geometry and appearance for this 320x240
+screen: a 40-pixel header, 158-pixel scrollable history and 42-pixel voice bar.
+User messages are green on the right; assistant messages are white on the left.
+Consecutive assistant sentences share a bubble, with a 2048-byte limit per bubble.
+The display keeps at most 20 chat items and the latest camera preview in RAM.
+Messages are not persisted on the device. Voice recognition fills user bubbles;
+there is no on-screen keyboard. Wake-word and BOOT control remain available.
+The global input-release chat toggle was removed so dragging history and sliders
+cannot accidentally start/stop a conversation.
 
 ## OV3660 still camera
 
