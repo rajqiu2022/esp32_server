@@ -10,7 +10,7 @@ from server.app import CONTROLLER, create_app
 from server.config import Config
 
 
-class ControlTests(unittest.IsolatedAsyncioTestCase):
+class ControlHarness(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.config = Config(self.temp.name)
@@ -39,6 +39,7 @@ class ControlTests(unittest.IsolatedAsyncioTestCase):
         return await self.client.post("/xiaozhi/" + path, json=data or {},
             headers={"Authorization": "Bearer " + self.config.secrets["internal"]})
 
+class ControlTests(ControlHarness):
     async def test_setup_sessions_and_access_control(self):
         self.assertEqual((await self.client.get("/api/overview")).status, 401)
         await self.login()

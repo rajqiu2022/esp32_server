@@ -28,7 +28,8 @@ def prepare():
     (settings.runtime / "data").mkdir(exist_ok=True)
     manager_url = f"http://127.0.0.1:{settings.port}/xiaozhi"
     runtime_config = {"server": {"ip": settings.host, "port": 8000, "http_port": 8003,
-                       "auth_key": settings.secrets["device"], "vision_explain": ""},
+                       "auth_key": settings.secrets["device"],
+                       "vision_explain": settings.public_url + "/mcp/vision/explain"},
                       "manager-api": {"url": manager_url, "secret": settings.secrets["internal"],
                                       "max_retries": 2, "retry_delay": 1},
                       "prompt_template": "agent-base-prompt.txt"}

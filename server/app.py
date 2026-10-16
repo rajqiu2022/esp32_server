@@ -15,6 +15,7 @@ from .config import Config, ROOT, VOICES, http_url
 from .live_context import with_live_context
 from .security import device_token, password_hash, password_matches, token_hash
 from .store import Store
+from .vision import Vision
 
 
 def text(data, key, maximum, minimum=1):
@@ -46,6 +47,7 @@ class Controller:
         self.store = Store(config.data / "control.db")
         self.failures = defaultdict(deque)
         self.chat_busy = set()
+        self.vision = Vision(self)
 
     def user(self, request):
         token = request.cookies.get("esp_session", "")
@@ -383,6 +385,7 @@ def create_app(config=None):
     app.router.add_get("/api/history", controller.history)
     app.router.add_post("/connect/{key}/ota/", controller.ota)
     app.router.add_post("/xiaozhi/{tail:.*}", controller.internal)
+    app.router.add_post("/mcp/vision/explain", controller.vision.handle)
     app.router.add_get("/", index)
     app.router.add_static("/static/", ROOT / "web")
     return app

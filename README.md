@@ -126,7 +126,7 @@ python scripts/smoke_voice.py --audio /path/to/test.mp3
 确认语音双向文字记录进入管理后台，并将回复解码为 `data/smoke-reply.wav`。
 结束后清理本次创建的临时设备和测试记录。
 
-本机与云端容器已通过 9 项控制台、迁移及识别配置测试；本机浏览器登录/添加设备/模型连接/网页对话已验证。
+控制台、迁移、识别配置与摄像头接口共 16 项自动化测试；本机浏览器登录/添加设备/模型连接/网页对话已验证。
 完整语音测试收到 103 个 Opus 包并成功解码，双向文字记录上报通过。
 模拟设备验证不等同于实物麦克风和扬声器验证。
 
@@ -136,6 +136,25 @@ python scripts/smoke_voice.py --audio /path/to/test.mp3
 不会把组件测试当作完整模型对话通过。
 
 ## 数据与配置
+
+### 摄像头拍照识别
+
+支持摄像头的固件通过 `self.camera.take_photo` 按需拍照，向
+`ESP_PUBLIC_URL/mcp/vision/explain` 上传 JPEG 与问题，再通过语音回答。
+模型配置必须支持 OpenAI 兼容的 `image_url` 图片输入；纯文本模型无法识图。
+接口只接受已绑定设备，由语音引擎在 MCP 初始化时提供短期凭据，同时校验 MAC 与 Client-Id。
+没有匿名或网页测试凭据绕过。每张照片最多 2 MiB、2048×2048 且不超过 400 万像素，
+全局只同时处理一张；识别超时会明确报错。
+
+应用不保存照片文件；照片会发送至管理端所配置的模型服务进行识别。
+这项能力用于单张照片问答，不提供连续视频或录像。
+已有 Nginx 部署需更新模板中的 `/mcp/vision/explain` 独立 location；其他接口维持 128 KiB 限制。
+
+```bash
+python -m unittest discover -s tests -v
+# 验证公网 HTTPS、真实 MCP 初始化令牌及真实视觉模型，使用临时模拟设备和纯红色测试图片
+python scripts/smoke_vision.py --credentials-stdin
+```
 
 `data/control.db` 包含账户、API Key、设备凭据和对话，`data/secrets.json` 包含内部服务密钥。
 两者都属于私有部署数据，备份时一起保存；不会上传 GitHub。

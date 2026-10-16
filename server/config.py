@@ -71,6 +71,7 @@ class Config:
             config["ASR"][asr].update({"model_dir": str(self.models / "SenseVoiceSmall"), "language": "zh"})
         config["VAD"]["SileroVAD"]["model_dir"] = str(self.models / "snakers4_silero-vad")
         config["server"] = {"ip": self.host, "port": 8000, "http_port": 8003,
+                            "vision_explain": self.public_url + "/mcp/vision/explain",
                             "auth_key": self.secrets["device"], "auth": {"enabled": True}}
         config["log"]["log_dir"] = "tmp"
         config["log"]["log_level"] = "INFO"
