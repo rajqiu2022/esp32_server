@@ -27,6 +27,7 @@ from server.store import Store
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--audio", type=Path)
+parser.add_argument("--simulate-light", action="store_true", help="Prove live ASR/model/MCP routing against a temporary virtual lamp")
 parser.add_argument("--text", default="你好，请用一句简短的话介绍你自己。")
 parser.add_argument("--expect-text", help="Require this text in the generated speech transcript")
 parser.add_argument("--credentials-stdin", action="store_true", help="Read login JSON from stdin without saving a password file")
@@ -45,6 +46,7 @@ async def main():
     client_id = uuid.uuid4().hex
     store = Store(settings.data / "control.db")
     created = False
+    fixture_task = None
     try:
         async with ClientSession(cookie_jar=CookieJar(unsafe=True, treat_as_secure_origin=[base_url]), headers=host_headers) as http:
             async with http.post(base_url + "/api/login", json=credentials) as response:
@@ -74,11 +76,20 @@ async def main():
                 audio_path = settings.data / "smoke-input.mp3"
                 await edge_tts.Communicate(args.text, "zh-CN-XiaoxiaoNeural").save(str(audio_path))
             async with connect(ws_url, additional_headers=headers) as ws:
-                await ws.send(json.dumps({"type": "hello", "version": 1, "transport": "websocket", "features": {"mcp": False},
+                if args.simulate_light:
+                    from light_fixture import LightFixture
+                    fixture = LightFixture()
+                    fixture_task = asyncio.create_task(fixture.read(ws))
+                    recv = fixture.recv
+                else:
+                    recv = ws.recv
+                await ws.send(json.dumps({"type": "hello", "version": 1, "transport": "websocket", "features": {"mcp": args.simulate_light},
                     "audio_params": {"format": "opus", "sample_rate": 16000, "channels": 1, "frame_duration": 60}}))
-                hello = json.loads(await asyncio.wait_for(ws.recv(), 30))
+                hello = json.loads(await asyncio.wait_for(recv(), 30))
                 assert hello.get("type") == "hello"
                 print("PASS: enrollment, invalid-token rejection, authenticated WebSocket hello", flush=True)
+                if args.simulate_light:
+                    await asyncio.wait_for(fixture.ready.wait(), 15)
                 await asyncio.sleep(2)
                 audio = AudioSegment.from_file(audio_path).set_channels(1).set_frame_rate(16000).set_sample_width(2)
                 encoder = opuslib_next.Encoder(16000, 1, opuslib_next.APPLICATION_AUDIO)
@@ -90,7 +101,7 @@ async def main():
                 await ws.send(json.dumps({"type": "listen", "state": "stop"}))
                 packets, messages = [], []
                 while True:
-                    message = await asyncio.wait_for(ws.recv(), 90)
+                    message = await asyncio.wait_for(recv(), 90)
                     if isinstance(message, bytes):
                         packets.append(message)
                         continue
@@ -102,6 +113,9 @@ async def main():
                     if obj.get("type") == "tts" and obj.get("state") == "stop":
                         break
                 assert any(m.get("type") == "stt" and m.get("text") for m in messages), "No ASR result"
+                if args.simulate_light:
+                    assert fixture.calls and fixture.on is True, "Model did not execute the lamp-on tool"
+                    print("PASS: recognized speech caused an acknowledged device MCP lamp-on call", flush=True)
                 if args.speech_only:
                     print("PASS: live cloud worker recognized synthetic speech", flush=True)
                     target = settings.data / "cloud-tts-check.mp3"
@@ -134,6 +148,9 @@ async def main():
                 else:
                     raise AssertionError("Voice history did not reach the control plane")
     finally:
+        if fixture_task:
+            fixture_task.cancel()
+            await asyncio.gather(fixture_task, return_exceptions=True)
         if created:
             # Remove only this run's random virtual-device fixture and its messages.
             with store.connect() as db:

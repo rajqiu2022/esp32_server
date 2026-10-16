@@ -50,13 +50,13 @@ class Config:
         self.secrets = json.loads(path.read_text(encoding="utf-8"))
 
     def agent_config(self, agent, model):
-        return {"selected_module": {"LLM": "ManagedLLM", "TTS": "ManagedTTS", "Memory": "nomem", "Intent": "nointent"},
+        return {"selected_module": {"LLM": "ManagedLLM", "TTS": "ManagedTTS", "Memory": "nomem", "Intent": "function_call"},
                 "LLM": {"ManagedLLM": {"type": "studio", "base_url": model["base_url"],
                     "model_name": model["model"], "api_key": model["api_key"] or "ollama",
                     "temperature": model["temperature"], "max_tokens": model["max_tokens"], "timeout": 60}},
                 "TTS": {"ManagedTTS": {"type": "edge", "voice": agent["voice"], "rate": str(agent["rate"]),
                     "volume": "0", "pitch": "0", "output_dir": "tmp/"}},
-                "Memory": {"nomem": {"type": "nomem"}}, "Intent": {"nointent": {"type": "nointent"}},
+                "Memory": {"nomem": {"type": "nomem"}}, "Intent": {"function_call": {"type": "function_call", "functions": []}},
                 "prompt": agent["prompt"], "chat_history_conf": 1, "device_max_output_size": 0}
 
     def engine_config(self, agent, model):

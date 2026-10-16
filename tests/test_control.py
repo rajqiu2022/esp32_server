@@ -101,6 +101,8 @@ class ControlTests(unittest.IsolatedAsyncioTestCase):
         data = {"macAddress": "aa:bb:cc:dd:ee:ff", "clientId": "uuid"}
         cfg = await (await self.internal("config/agent-models", data)).json()
         self.assertEqual(cfg["data"]["prompt"], agent["prompt"])
+        self.assertEqual(cfg["data"]["selected_module"]["Intent"], "function_call")
+        self.assertEqual(cfg["data"]["Intent"]["function_call"]["functions"], [])
         self.assertEqual(cfg["data"]["TTS"]["ManagedTTS"]["voice"], agent["voice"])
         report = {"macAddress": data["macAddress"], "sessionId": "session-1", "chatType": 1, "content": "你好", "reportTime": 1700000000000}
         for _ in range(2):
