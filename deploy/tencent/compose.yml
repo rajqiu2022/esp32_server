@@ -1,0 +1,43 @@
+services:
+  studio:
+    build:
+      context: ../..
+    init: true
+    restart: unless-stopped
+    environment:
+      ESP_BIND_HOST: 0.0.0.0
+      ESP_PUBLIC_URL: https://${ESP_DOMAIN:?Set ESP_DOMAIN in .env.tencent}
+      ESP_WS_URL: wss://${ESP_DOMAIN:?Set ESP_DOMAIN in .env.tencent}/xiaozhi/v1/
+    volumes:
+      - ../../data:/app/data
+    expose:
+      - "8000"
+      - "8002"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "from urllib.request import urlopen; urlopen('http://127.0.0.1:8002/api/health', timeout=3).close(); urlopen('http://127.0.0.1:8000/', timeout=3).close()"
+      interval: 30s
+      timeout: 10s
+      start_period: 120s
+      retries: 3
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      ESP_DOMAIN: ${ESP_DOMAIN:?Set ESP_DOMAIN in .env.tencent}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      studio:
+        condition: service_healthy
+volumes:
+  caddy_data:
+  caddy_config:

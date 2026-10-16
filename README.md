@@ -88,6 +88,8 @@ Windows 原生安装还需让当前 Python 找到 `opus.dll` 与完整的 FFmpeg
 
 ## Docker / 云服务器
 
+腾讯云的单域名 HTTPS/WSS 配置与账号迁移说明见 [腾讯云部署](deploy/tencent/README.md)。
+
 提供 `Dockerfile`、`compose.yml` 和前台进程监督器，尚未在当前无 Docker 的 Windows 环境验证镜像构建。
 
 ```bash
@@ -123,7 +125,7 @@ python scripts/smoke_voice.py --audio /path/to/test.mp3
 确认语音双向文字记录进入管理后台，并将回复解码为 `data/smoke-reply.wav`。
 结束后清理本次创建的临时设备和测试记录。
 
-本机已通过 7 项控制台集成测试、浏览器登录/添加设备/模型连接/网页对话验证，
+本机已通过 8 项控制台与迁移集成测试、浏览器登录/添加设备/模型连接/网页对话验证，
 完整语音测试收到 103 个 Opus 包并成功解码，双向文字记录上报通过。
 模拟设备验证不等同于实物麦克风和扬声器验证。
 

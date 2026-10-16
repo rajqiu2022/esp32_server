@@ -3,5 +3,5 @@ data
 .runtime
 .venv
 **/__pycache__
-.env
+.env*
 test-results

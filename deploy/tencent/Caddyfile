@@ -1,0 +1,15 @@
+{$ESP_DOMAIN} {
+    # Route device WebSocket traffic before the internal manager API block.
+    handle /xiaozhi/v1/* {
+        reverse_proxy studio:8000
+    }
+
+    # These routes are for the local voice worker, never for public clients.
+    handle /xiaozhi/* {
+        respond 404
+    }
+
+    handle {
+        reverse_proxy studio:8002
+    }
+}
