@@ -1,0 +1,10 @@
+FROM python:3.10-slim
+WORKDIR /app
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
+COPY server/ server/
+COPY scripts/run.py scripts/run.py
+COPY web/ web/
+ENV PYTHONUNBUFFERED=1 PYTHONUTF8=1 ESP_BIND_HOST=0.0.0.0 ESP_DATA_DIR=/app/data
+EXPOSE 8002
+CMD ["python", "scripts/run.py", "control"]

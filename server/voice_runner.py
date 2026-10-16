@@ -13,8 +13,10 @@ from .config import Config
 
 def prepare():
     settings = Config()
-    if not (settings.models / "SenseVoiceSmall" / "model.pt").exists():
-        raise RuntimeError("SenseVoiceSmall model.pt is missing; configure ESP_MODELS_DIR first")
+    asr_file = (settings.models / "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17" / "model.int8.onnx"
+                if settings.asr_backend == "sherpa" else settings.models / "SenseVoiceSmall" / "model.pt")
+    if not asr_file.exists():
+        raise RuntimeError("ASR model is missing; run scripts/prepare_models.py with the deployment ASR settings first")
     if not settings.source.exists():
         raise RuntimeError("Run git submodule update --init --recursive first")
     shutil.copytree(settings.source, settings.runtime, dirs_exist_ok=True,

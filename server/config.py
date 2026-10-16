@@ -33,6 +33,9 @@ class Config:
         self.runtime = ROOT / ".runtime" / "voice"
         self.source = ROOT / "vendor" / "xiaozhi" / "main" / "xiaozhi-server"
         self.models = Path(os.environ.get("ESP_MODELS_DIR", self.data / "models")).resolve()
+        self.asr_backend = os.environ.get("ESP_ASR_BACKEND", "funasr")
+        if self.asr_backend not in ("funasr", "sherpa"):
+            raise ValueError("ESP_ASR_BACKEND must be funasr or sherpa")
         self.cookie_secure = self.public_url.startswith("https://")
         path = self.data / "secrets.json"
         if not path.exists():
@@ -60,8 +63,12 @@ class Config:
         config = yaml.safe_load((self.source / "config.yaml").read_text(encoding="utf-8"))
         private = self.agent_config(agent, model)
         config.update({key: value for key, value in private.items() if key != "selected_module"})
-        config["selected_module"] = {"VAD": "SileroVAD", "ASR": "FunASR", **private["selected_module"]}
-        config["ASR"]["FunASR"].update({"model_dir": str(self.models / "SenseVoiceSmall"), "language": "zh"})
+        asr = "SherpaASR" if self.asr_backend == "sherpa" else "FunASR"
+        config["selected_module"] = {"VAD": "SileroVAD", "ASR": asr, **private["selected_module"]}
+        if self.asr_backend == "sherpa":
+            config["ASR"][asr]["model_dir"] = str(self.models / "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17")
+        else:
+            config["ASR"][asr].update({"model_dir": str(self.models / "SenseVoiceSmall"), "language": "zh"})
         config["VAD"]["SileroVAD"]["model_dir"] = str(self.models / "snakers4_silero-vad")
         config["server"] = {"ip": self.host, "port": 8000, "http_port": 8003,
                             "auth_key": self.secrets["device"], "auth": {"enabled": True}}

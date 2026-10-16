@@ -6,6 +6,7 @@ services:
     restart: unless-stopped
     environment:
       ESP_BIND_HOST: 0.0.0.0
+      ESP_ASR_BACKEND: ${ESP_ASR_BACKEND:-sherpa}
       ESP_PUBLIC_URL: https://${ESP_DOMAIN:?Set ESP_DOMAIN in .env.tencent}
       ESP_WS_URL: wss://${ESP_DOMAIN:?Set ESP_DOMAIN in .env.tencent}/xiaozhi/v1/
     volumes:

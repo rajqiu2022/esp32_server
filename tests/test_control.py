@@ -117,6 +117,16 @@ class ControlTests(unittest.IsolatedAsyncioTestCase):
         self.controller.store.save_setting("runtime", {"time": time.time() - 60, "devices": ["aa:bb:cc:dd:ee:ff"]})
         self.assertFalse((await (await self.client.get("/api/devices")).json())[0]["online"])
 
+    async def test_cloud_worker_receives_quantized_asr_config(self):
+        self.config.asr_backend = "sherpa"
+        response = await self.internal("config/server-base")
+        self.assertEqual(response.status, 200)
+        config = (await response.json())["data"]
+        name = config["selected_module"]["ASR"]
+        self.assertEqual(config["ASR"][name]["type"], "sherpa_onnx_local")
+        self.assertTrue(Path(config["ASR"][name]["model_dir"]).is_relative_to(self.config.models))
+        self.assertTrue(config["server"]["auth"]["enabled"])
+
     async def test_chat_preserves_context_and_rejects_cross_agent_sessions(self):
         agent = await self.login()
         seen = []

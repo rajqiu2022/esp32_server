@@ -1,0 +1,31 @@
+server {
+    listen __HTTPS_PORT__ ssl;
+    server_name __DOMAIN__;
+    ssl_certificate __CERTIFICATE__;
+    ssl_certificate_key __CERTIFICATE_KEY__;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    client_max_body_size 128k;
+    # Enrollment URLs contain credentials, so do not put request URLs in access logs.
+    access_log off;
+
+    location ^~ /xiaozhi/v1/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $http_host;
+        proxy_read_timeout 300s;
+    }
+
+    location ^~ /xiaozhi/ {
+        return 404;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:8002;
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_read_timeout 120s;
+    }
+}

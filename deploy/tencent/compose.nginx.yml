@@ -1,0 +1,30 @@
+# For servers with an existing Nginx installation. No HTTP/HTTPS ports are published here.
+services:
+  studio:
+    build:
+      context: ../..
+      dockerfile: deploy/tencent/Dockerfile.cloud
+    init: true
+    restart: unless-stopped
+    mem_limit: 1200m
+    cpus: 1.5
+    environment:
+      ESP_BIND_HOST: 0.0.0.0
+      ESP_ASR_BACKEND: sherpa
+      ESP_PUBLIC_URL: ${ESP_PUBLIC_URL:?Set the public HTTPS URL}
+      ESP_WS_URL: ${ESP_WS_URL:?Set the public WSS URL}
+    ports:
+      - "127.0.0.1:8002:8002"
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ../../data:/app/data
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "from urllib.request import urlopen; urlopen('http://127.0.0.1:8002/api/health', timeout=3).close(); urlopen('http://127.0.0.1:8000/', timeout=3).close()"
+      interval: 30s
+      timeout: 10s
+      start_period: 120s
+      retries: 3
