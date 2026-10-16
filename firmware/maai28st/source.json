@@ -1,0 +1,21 @@
+{
+  "board": "makerfabs-maai28st",
+  "hardware_model": "Makerfabs MAAI28ST",
+  "upstream_url": "https://github.com/78/xiaozhi-esp32.git",
+  "upstream_commit": "d7a1c05308fb6e116ffb44b9e2c6e67b3366302a",
+  "upstream_version": "2.5.3",
+  "esp_idf_tested": "6.0.1",
+  "language": "zh-CN",
+  "target": "esp32s3",
+  "flash_mb": 16,
+  "psram_mb": 8,
+  "application_flash_offset": "0x20000",
+  "validation": {
+    "build_passed": true,
+    "flash_hash_verified": true,
+    "physical_lamp_confirmed_by_user": true,
+    "camera_sensor": "OV3660 PID 0x3660",
+    "camera_frame": "640x480 RGB565, 614400 bytes",
+    "physical_camera_voice_roundtrip_confirmed_by_user": false
+  }
+}

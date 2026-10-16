@@ -1,0 +1,14 @@
+{
+    "type": "makerfabs-maai28st",
+    "target": "esp32s3",
+    "builds": [
+        {
+            "name": "makerfabs-maai28st",
+            "sdkconfig_append": [
+                "CONFIG_ESPTOOLPY_FLASHMODE_DIO=y",
+                "CONFIG_ESP_CONSOLE_UART_DEFAULT=y",
+                "CONFIG_ESP_CONSOLE_SECONDARY_NONE=y"
+            ]
+        }
+    ]
+}

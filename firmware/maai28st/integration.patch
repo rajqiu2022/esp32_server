@@ -1,0 +1,30 @@
+diff --git a/main/CMakeLists.txt b/main/CMakeLists.txt
+index 08b3a61..4e58d84 100644
+--- a/main/CMakeLists.txt
++++ b/main/CMakeLists.txt
+@@ -595,6 +595,11 @@ elseif(CONFIG_BOARD_TYPE_ESP_MOSAICO)
+     set(BUILTIN_TEXT_FONT font_noto_sans_basic_30_4)
+     set(BUILTIN_ICON_FONT font_material_symbols_30_4)
+     set(DEFAULT_EMOJI_COLLECTION noto-color-emoji_64)
++elseif(CONFIG_BOARD_TYPE_MAKERFABS_MAAI28ST)
++    set(BOARD_DIR "makerfabs-maai28st")
++    set(BUILTIN_TEXT_FONT font_noto_sans_basic_20_4)
++    set(BUILTIN_ICON_FONT font_material_symbols_20_4)
++    set(DEFAULT_EMOJI_COLLECTION noto-color-emoji_32)
+ elseif(CONFIG_BOARD_TYPE_BREAD_COMPACT_WIFI_LCD)
+     set(BOARD_DIR "bread-compact-wifi-lcd")
+     set(BUILTIN_TEXT_FONT font_noto_sans_basic_16_4)
+diff --git a/main/Kconfig.projbuild b/main/Kconfig.projbuild
+index a26d45a..ec45572 100644
+--- a/main/Kconfig.projbuild
++++ b/main/Kconfig.projbuild
+@@ -377,6 +377,9 @@ choice BOARD_TYPE
+     config BOARD_TYPE_MAGICLICK_C3_V2
+         bool "Magiclick C3 V2 (神奇按钮)"
+         depends on IDF_TARGET_ESP32C3
++    config BOARD_TYPE_MAKERFABS_MAAI28ST
++        bool "Makerfabs MaTouch AI 2.8 ST7789V (MAAI28ST)"
++        depends on IDF_TARGET_ESP32S3
+     config BOARD_TYPE_MAZA_AI_ESP32_S3
+         bool "Maza AI ESP32-S3"
+         depends on IDF_TARGET_ESP32S3
