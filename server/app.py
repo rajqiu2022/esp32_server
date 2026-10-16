@@ -12,6 +12,7 @@ from urllib.parse import urlsplit
 from aiohttp import ClientSession, ClientTimeout, web
 
 from .config import Config, ROOT, VOICES, http_url
+from .live_context import with_live_context
 from .security import device_token, password_hash, password_matches, token_hash
 from .store import Store
 
@@ -197,6 +198,7 @@ class Controller:
 
     async def completion(self, messages):
         model = self.store.setting("model")
+        messages = with_live_context(messages, model["model"])
         async with ClientSession(timeout=ClientTimeout(total=90), trust_env=False) as client:
             try:
                 async with client.post(model["base_url"] + "/chat/completions", json={"model": model["model"],

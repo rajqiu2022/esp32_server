@@ -27,6 +27,8 @@ from server.store import Store
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--audio", type=Path)
+parser.add_argument("--text", default="你好，请用一句简短的话介绍你自己。")
+parser.add_argument("--expect-text", help="Require this text in the generated speech transcript")
 parser.add_argument("--credentials-stdin", action="store_true", help="Read login JSON from stdin without saving a password file")
 parser.add_argument("--local-services", action="store_true", help="Test loopback services inside a cloud container")
 parser.add_argument("--speech-only", action="store_true", help="Verify live ASR and independent TTS while the LLM API is unconfigured")
@@ -70,7 +72,7 @@ async def main():
                 audio_path = args.audio
             else:
                 audio_path = settings.data / "smoke-input.mp3"
-                await edge_tts.Communicate("你好，请用一句简短的话介绍你自己。", "zh-CN-XiaoxiaoNeural").save(str(audio_path))
+                await edge_tts.Communicate(args.text, "zh-CN-XiaoxiaoNeural").save(str(audio_path))
             async with connect(ws_url, additional_headers=headers) as ws:
                 await ws.send(json.dumps({"type": "hello", "version": 1, "transport": "websocket", "features": {"mcp": False},
                     "audio_params": {"format": "opus", "sample_rate": 16000, "channels": 1, "frame_duration": 60}}))
@@ -111,6 +113,10 @@ async def main():
                     required_roles = {"user"}
                 else:
                     assert packets, "No synthesized audio received"
+                    if args.expect_text:
+                        transcript = "".join(m.get("text", "") for m in messages if m.get("type") == "tts")
+                        assert args.expect_text in transcript, f"Expected answer missing: {transcript}"
+                        print("PASS: expected answer in generated speech: " + transcript, flush=True)
                     sample_rate = hello.get("audio_params", {}).get("sample_rate", 16000)
                     decoder = opuslib_next.Decoder(sample_rate, 1)
                     with wave.open(str(settings.data / "smoke-reply.wav"), "wb") as output:

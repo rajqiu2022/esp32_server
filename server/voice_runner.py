@@ -21,6 +21,10 @@ def prepare():
         raise RuntimeError("Run git submodule update --init --recursive first")
     shutil.copytree(settings.source, settings.runtime, dirs_exist_ok=True,
                     ignore=shutil.ignore_patterns("models", "data", "tmp", "__pycache__", ".config.yaml"))
+    provider = settings.runtime / "core/providers/llm/studio"
+    provider.mkdir(parents=True, exist_ok=True)
+    (provider / "__init__.py").touch()
+    shutil.copyfile(Path(__file__).with_name("managed_llm.py"), provider / "studio.py")
     (settings.runtime / "data").mkdir(exist_ok=True)
     manager_url = f"http://127.0.0.1:{settings.port}/xiaozhi"
     runtime_config = {"server": {"ip": settings.host, "port": 8000, "http_port": 8003,

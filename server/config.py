@@ -51,7 +51,7 @@ class Config:
 
     def agent_config(self, agent, model):
         return {"selected_module": {"LLM": "ManagedLLM", "TTS": "ManagedTTS", "Memory": "nomem", "Intent": "nointent"},
-                "LLM": {"ManagedLLM": {"type": "openai", "base_url": model["base_url"],
+                "LLM": {"ManagedLLM": {"type": "studio", "base_url": model["base_url"],
                     "model_name": model["model"], "api_key": model["api_key"] or "ollama",
                     "temperature": model["temperature"], "max_tokens": model["max_tokens"], "timeout": 60}},
                 "TTS": {"ManagedTTS": {"type": "edge", "voice": agent["voice"], "rate": str(agent["rate"]),
