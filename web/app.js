@@ -206,7 +206,7 @@ function renderPage() {
 function networkNotice() {
   const local = ['127.0.0.1', 'localhost'].includes(new URL(state.overview.public_url).hostname);
   return local
-    ? `<div class="notice"><b>接入提示</b>　当前后台只在独立部署，可以先测试角色和模型。板子接入需要能访问这台电脑；目前手机热点与电脑有线网络尚未互通。</div>`
+    ? `<div class="notice"><b>接入提示</b>　当前后台只在本机运行，可以先测试角色和模型。板子接入前，需要配置可达的服务地址，并确保它与服务器网络互通。</div>`
     : '';
 }
 async function navigate(page) {
